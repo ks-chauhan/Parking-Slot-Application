@@ -80,7 +80,7 @@ if uploaded_file:
         fill_color="rgba(0,255,0,0.2)",
         stroke_width=2,
         stroke_color="#00FF00",
-        background_image=display_image,
+        background_image=Image.fromarray(display_np),
         update_streamlit=True,
         height=display_np.shape[0],
         width=display_np.shape[1],
