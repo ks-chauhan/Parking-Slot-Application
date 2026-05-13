@@ -56,7 +56,7 @@ if uploaded_file:
 
     display_image = image.resize(
         (DISPLAY_WIDTH, display_height)
-    )
+    ).convert("RGBA")
 
     display_np = np.array(display_image)
 
