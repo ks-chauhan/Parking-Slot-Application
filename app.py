@@ -28,147 +28,194 @@ uploaded_file = st.file_uploader(
     type=["jpg", "jpeg", "png"]
 )
 
-if uploaded_file:
+# -----------------------------------
+# Main Logic
+# -----------------------------------
 
-    # -----------------------------------
-    # Load Image
-    # -----------------------------------
+if uploaded_file is not None:
 
-    image = Image.open(uploaded_file).convert("RGB")
+    try:
 
-    # Save uploaded image
-    image.save("uploaded_parking_image.jpg")
+        # -----------------------------------
+        # Load Image Safely
+        # -----------------------------------
 
-    # Original dimensions
-    original_width, original_height = image.size
+        image = Image.open(uploaded_file)
 
-    # -----------------------------------
-    # Resize Image For Display
-    # -----------------------------------
+        # Convert properly
+        image = image.convert("RGB")
 
-    DISPLAY_WIDTH = 1000
+        # Save uploaded image
+        image.save("uploaded_parking_image.jpg")
 
-    scale_ratio = DISPLAY_WIDTH / original_width
+        # -----------------------------------
+        # Original Dimensions
+        # -----------------------------------
 
-    display_height = int(
-        original_height * scale_ratio
-    )
+        original_width, original_height = image.size
 
-    display_image = image.resize(
-        (DISPLAY_WIDTH, display_height)
-    ).convert("RGBA")
+        # -----------------------------------
+        # Resize Image For Display
+        # -----------------------------------
 
-    display_np = np.array(display_image)
+        DISPLAY_WIDTH = 1000
 
-    # -----------------------------------
-    # Slot Annotation Section
-    # -----------------------------------
+        scale_ratio = DISPLAY_WIDTH / original_width
 
-    st.subheader("Draw Parking Slots")
-
-    st.markdown("""
-    Instructions:
-    - Draw rectangles around parking slots
-    - Each rectangle represents one parking space
-    """)
-
-    # -----------------------------------
-    # Drawable Canvas
-    # -----------------------------------
-
-    canvas_result = st_canvas(
-        fill_color="rgba(0,255,0,0.2)",
-        stroke_width=2,
-        stroke_color="#00FF00",
-        background_image=Image.fromarray(display_np),
-        update_streamlit=True,
-        height=display_np.shape[0],
-        width=display_np.shape[1],
-        drawing_mode="rect",
-        key="canvas",
-    )
-
-    # -----------------------------------
-    # Extract Parking Slots
-    # -----------------------------------
-
-    parking_slots = []
-
-    if canvas_result.json_data is not None:
-
-        objects = canvas_result.json_data["objects"]
-
-        for obj in objects:
-
-            x = int(obj["left"] / scale_ratio)
-            y = int(obj["top"] / scale_ratio)
-            w = int(obj["width"] / scale_ratio)
-            h = int(obj["height"] / scale_ratio)
-
-            slot = {
-                "x1": x,
-                "y1": y,
-                "x2": x + w,
-                "y2": y + h
-            }
-
-            parking_slots.append(slot)
-
-    # -----------------------------------
-    # Display Slot Coordinates
-    # -----------------------------------
-
-    st.subheader("Detected Parking Slots")
-
-    st.write(parking_slots)
-
-    # -----------------------------------
-    # Save Parking Layout
-    # -----------------------------------
-
-    if st.button("Save Parking Layout"):
-
-        with open("parking_slots.json", "w") as f:
-
-            json.dump(
-                parking_slots,
-                f,
-                indent=4
-            )
-
-        st.success(
-            "Parking layout saved successfully!"
+        display_height = int(
+            original_height * scale_ratio
         )
 
-    # -----------------------------------
-    # Predict Button
-    # -----------------------------------
+        # Convert to RGBA for deployment compatibility
+        display_image = image.resize(
+            (DISPLAY_WIDTH, display_height)
+        ).convert("RGBA")
 
-    predict_button = st.button(
-        "Predict Parking Occupancy"
-    )
-
-    # -----------------------------------
-    # Run Inference
-    # -----------------------------------
-
-    if predict_button:
+        # Convert to numpy
+        display_np = np.array(display_image)
 
         # -----------------------------------
-        # Load Saved Image
+        # Show Uploaded Image
         # -----------------------------------
 
-        image = Image.open(
-            "uploaded_parking_image.jpg"
-        ).convert("RGB")
+        st.subheader("Uploaded Parking Image")
 
-        preview_image = np.array(image).copy()
+        st.image(
+            display_image,
+            use_column_width=True
+        )
 
         # -----------------------------------
-        # Load Parking Slots
+        # Instructions
         # -----------------------------------
 
-        if os.path.exists("parking_slots.json"):
+        st.subheader("Draw Parking Slots")
+
+        st.markdown("""
+        Instructions:
+        - Draw rectangles around parking slots
+        - Each rectangle represents one parking space
+        """)
+
+        # -----------------------------------
+        # Drawable Canvas
+        # -----------------------------------
+
+        canvas_result = st_canvas(
+            fill_color="rgba(0,255,0,0.2)",
+            stroke_width=2,
+            stroke_color="#00FF00",
+
+            # VERY IMPORTANT FIX
+            background_image=display_image,
+
+            update_streamlit=True,
+            height=display_np.shape[0],
+            width=display_np.shape[1],
+            drawing_mode="rect",
+            key="canvas",
+        )
+
+        # -----------------------------------
+        # Extract Parking Slots
+        # -----------------------------------
+
+        parking_slots = []
+
+        if (
+            canvas_result.json_data is not None
+            and "objects" in canvas_result.json_data
+        ):
+
+            objects = canvas_result.json_data["objects"]
+
+            for obj in objects:
+
+                x = int(
+                    obj["left"] / scale_ratio
+                )
+
+                y = int(
+                    obj["top"] / scale_ratio
+                )
+
+                w = int(
+                    obj["width"] / scale_ratio
+                )
+
+                h = int(
+                    obj["height"] / scale_ratio
+                )
+
+                slot = {
+                    "x1": x,
+                    "y1": y,
+                    "x2": x + w,
+                    "y2": y + h
+                }
+
+                parking_slots.append(slot)
+
+        # -----------------------------------
+        # Show Coordinates
+        # -----------------------------------
+
+        st.subheader("Detected Parking Slots")
+
+        st.write(parking_slots)
+
+        # -----------------------------------
+        # Save Layout
+        # -----------------------------------
+
+        if st.button("Save Parking Layout"):
+
+            with open(
+                "parking_slots.json",
+                "w"
+            ) as f:
+
+                json.dump(
+                    parking_slots,
+                    f,
+                    indent=4
+                )
+
+            st.success(
+                "Parking layout saved successfully!"
+            )
+
+        # -----------------------------------
+        # Predict Button
+        # -----------------------------------
+
+        predict_button = st.button(
+            "Predict Parking Occupancy"
+        )
+
+        # -----------------------------------
+        # Run AI Prediction
+        # -----------------------------------
+
+        if predict_button:
+
+            # -----------------------------------
+            # Check Layout File
+            # -----------------------------------
+
+            if not os.path.exists(
+                "parking_slots.json"
+            ):
+
+                st.error(
+                    "Please save parking layout first."
+                )
+
+                st.stop()
+
+            # -----------------------------------
+            # Load Slots
+            # -----------------------------------
 
             with open(
                 "parking_slots.json",
@@ -177,126 +224,161 @@ if uploaded_file:
 
                 parking_slots = json.load(f)
 
-        else:
+            # -----------------------------------
+            # Load Original Image
+            # -----------------------------------
 
-            st.error(
-                "No parking layout found."
+            image = Image.open(
+                "uploaded_parking_image.jpg"
+            ).convert("RGB")
+
+            preview_image = np.array(
+                image
+            ).copy()
+
+            # -----------------------------------
+            # Statistics
+            # -----------------------------------
+
+            occupied_count = 0
+
+            # -----------------------------------
+            # Predict Each Slot
+            # -----------------------------------
+
+            for i, slot in enumerate(
+                parking_slots
+            ):
+
+                sx1 = slot["x1"]
+                sy1 = slot["y1"]
+                sx2 = slot["x2"]
+                sy2 = slot["y2"]
+
+                # -----------------------------------
+                # Safe Crop
+                # -----------------------------------
+
+                slot_crop = preview_image[
+                    sy1:sy2,
+                    sx1:sx2
+                ]
+
+                # Invalid crop protection
+                if (
+                    slot_crop is None
+                    or slot_crop.size == 0
+                ):
+                    continue
+
+                try:
+
+                    # -----------------------------------
+                    # AI Prediction
+                    # -----------------------------------
+
+                    prediction = predict_slot(
+                        slot_crop
+                    )
+
+                except Exception as e:
+
+                    st.error(
+                        f"Prediction failed: {e}"
+                    )
+
+                    continue
+
+                # -----------------------------------
+                # Colors
+                # -----------------------------------
+
+                if prediction == "Occupied":
+
+                    color = (0, 0, 255)
+
+                    occupied_count += 1
+
+                else:
+
+                    color = (0, 255, 0)
+
+                # -----------------------------------
+                # Draw Rectangle
+                # -----------------------------------
+
+                cv2.rectangle(
+                    preview_image,
+                    (sx1, sy1),
+                    (sx2, sy2),
+                    color,
+                    3
+                )
+
+                # -----------------------------------
+                # Draw Label
+                # -----------------------------------
+
+                cv2.putText(
+                    preview_image,
+                    prediction,
+                    (sx1, sy1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    color,
+                    2
+                )
+
+            # -----------------------------------
+            # Statistics
+            # -----------------------------------
+
+            total_slots = len(
+                parking_slots
             )
 
-            st.stop()
+            available_slots = (
+                total_slots
+                - occupied_count
+            )
 
-        # -----------------------------------
-        # Occupancy Detection
-        # -----------------------------------
+            st.subheader(
+                "Parking Statistics"
+            )
 
-        occupied_count = 0
+            col1, col2, col3 = st.columns(3)
 
-        for i, slot in enumerate(parking_slots):
+            col1.metric(
+                "Total Slots",
+                total_slots
+            )
 
-            sx1 = slot["x1"]
-            sy1 = slot["y1"]
-            sx2 = slot["x2"]
-            sy2 = slot["y2"]
+            col2.metric(
+                "Occupied",
+                occupied_count
+            )
 
-            # -----------------------------------
-            # Crop Parking Slot
-            # -----------------------------------
-
-            slot_crop = preview_image[
-                sy1:sy2,
-                sx1:sx2
-            ]
-
-            # Prevent invalid crops
-            if slot_crop.size == 0:
-                continue
-
-            # -----------------------------------
-            # AI Prediction
-            # -----------------------------------
-
-            prediction = predict_slot(
-                slot_crop
+            col3.metric(
+                "Available",
+                available_slots
             )
 
             # -----------------------------------
-            # Determine Slot Status
+            # Final Result
             # -----------------------------------
 
-            if prediction == "Occupied":
+            st.subheader(
+                "AI Parking Occupancy Result"
+            )
 
-                color = (0, 0, 255)
-
-                occupied_count += 1
-
-            else:
-
-                color = (0, 255, 0)
-
-            # -----------------------------------
-            # Draw Slot Rectangle
-            # -----------------------------------
-
-            cv2.rectangle(
+            st.image(
                 preview_image,
-                (sx1, sy1),
-                (sx2, sy2),
-                color,
-                3
+                channels="RGB",
+                use_column_width=True
             )
 
-            # -----------------------------------
-            # Draw Slot Label
-            # -----------------------------------
+    except Exception as e:
 
-            cv2.putText(
-                preview_image,
-                f"{prediction}",
-                (sx1, sy1 - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                color,
-                2
-            )
-
-        # -----------------------------------
-        # Statistics
-        # -----------------------------------
-
-        total_slots = len(parking_slots)
-
-        available_slots = (
-            total_slots - occupied_count
-        )
-
-        st.subheader("Parking Statistics")
-
-        col1, col2, col3 = st.columns(3)
-
-        col1.metric(
-            "Total Slots",
-            total_slots
-        )
-
-        col2.metric(
-            "Occupied",
-            occupied_count
-        )
-
-        col3.metric(
-            "Available",
-            available_slots
-        )
-
-        # -----------------------------------
-        # Final Result
-        # -----------------------------------
-
-        st.subheader(
-            "AI Parking Occupancy Result"
-        )
-
-        st.image(
-            preview_image,
-            channels="RGB"
+        st.error(
+            f"Application Error: {e}"
         )
